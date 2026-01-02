@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AnaesLog – v1.0 STABLE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Roboto,Arial;background:#f4f6f9;color:#212529}
+.header{background:#0d6efd;color:#fff;padding:14px;text-align:center}
+.nav{display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+.nav button{flex:1;min-width:110px;padding:9px;border:none;border-radius:6px;background:#e9ecef;font-weight:600}
+.nav button.active{background:#0d6efd;color:#fff}
+.section{display:none;padding:12px}
+.section.active{display:block}
+.card{background:#fff;padding:14px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.08);margin-bottom:12px}
+label{font-weight:600;font-size:13px}
+input,select,button{width:100%;padding:8px;margin:6px 0;border-radius:6px;border:1px solid #ccc;font-size:14px}
+button.primary{background:#0d6efd;color:#fff;border:none}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border:1px solid #ddd;padding:6px}
+th{background:#0d6efd;color:#fff}
+.amount{color:#198754;font-weight:700}
+.footer{text-align:center;font-size:12px;color:#6c757d;padding:10px}
+.filters{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <h3>AnaesLog</h3>
+  <div>v1.0 STABLE – Anaesthesia Case & Receipt Log</div>
+</div>
+
+<div class="nav">
+  <button onclick="show('ana',this)">Anaesthetist</button>
+  <button onclick="show('hospital',this)">Hospital</button>
+  <button onclick="show('case',this)">New Case</button>
+  <button onclick="show('list',this)">Cases</button>
+  <button onclick="show('receipt',this)">Receipt</button>
+  <button class="active" onclick="show('summary',this)">Summary</button>
+</div>
+
+<!-- ANAESTHETIST -->
+<div id="ana" class="section">
+<div class="card">
+<h4>Anaesthetist Profile</h4>
+<label>Name</label><input id="a_name">
+<label>Registration No</label><input id="a_reg">
+<button class="primary" onclick="saveAna()">Save</button>
+</div>
+</div>
+
+<!-- HOSPITAL -->
+<div id="hospital" class="section">
+<div class="card">
+<h4>Hospital / Clinic</h4>
+<label>Name</label><input id="h_name">
+<label>City</label><input id="h_city">
+<label>Address</label><input id="h_address">
+<button class="primary" onclick="saveHospital()">Save</button>
+</div>
+</div>
+
+<!-- NEW CASE -->
+<div id="case" class="section">
+<div class="card">
+<h4>New Case</h4>
+<label>Date</label><input type="date" id="c_date">
+<label>Patient Name</label><input id="c_patient">
+<label>Age</label><input id="c_age">
+<label>Sex</label><input list="sexList" id="c_sex">
+<datalist id="sexList"><option>Male</option><option>Female</option></datalist>
+<label>IPD / OPD</label><input id="c_ipd">
+<label>Surgery</label><input list="surgeryList" id="c_surgery"><datalist id="surgeryList"></datalist>
+<label>Surgeon</label><input list="surgeonList" id="c_surgeon"><datalist id="surgeonList"></datalist>
+<label>Anaesthesia</label><input list="anaList" id="c_ana"><datalist id="anaList"></datalist>
+<label>Charges (₹)</label><input id="c_amount">
+<button class="primary" onclick="saveCase()">Save Case</button>
+</div>
+</div>
+
+<!-- CASE LIST -->
+<div id="list" class="section">
+<div class="card">
+<h4>Saved Cases</h4>
+<table>
+<thead><tr><th>Date</th><th>Patient</th><th>Surgery</th><th>₹</th><th>Action</th></tr></thead>
+<tbody id="caseTable"></tbody>
+</table>
+</div>
+</div>
+
+<!-- RECEIPT -->
+<div id="receipt" class="section">
+<div class="card">
+<h4>Receipt</h4>
+<div id="receiptBody">Select a case from list</div>
+<button class="primary" onclick="generateReceiptPDF()">📄 Download Receipt PDF</button>
+</div>
+</div>
+
+<!-- SUMMARY -->
+<div id="summary" class="section active">
+<div class="card">
+<h4>Summary</h4>
+<div class="filters">
+<select id="filterType" onchange="applyFilter()">
+<option value="all">All</option>
+<option value="daily">Daily</option>
+<option value="monthly">Monthly</option>
+<option value="yearly">Yearly</option>
+<option value="range">Range</option>
+</select>
+<input type="date" id="fromDate" onchange="applyFilter()">
+<input type="date" id="toDate" onchange="applyFilter()">
+<button onclick="exportCSV()">CSV</button>
+<button onclick="exportExcel()">Excel</button>
+<button class="primary" onclick="exportPDF()">PDF</button>
+</div>
+<table>
+<thead><tr><th>#</th><th>Date</th><th>Receipt</th><th>Patient</th><th>Age/Sex</th><th>Surgery</th><th>Anaesthesia</th><th>₹</th></tr></thead>
+<tbody id="summaryTable"></tbody>
+<tfoot><tr class="amount"><td colspan="7">Total</td><td id="totalAmount">0</td></tr></tfoot>
+</table>
+</div>
+</div>
+
+<div class="footer">AnaesLog v1.0 STABLE</div>
+
+<script>
+/* STORAGE */
+let cases=JSON.parse(localStorage.getItem("cases")||"[]");
+let currentCase=null;
+
+/* NAV */
+function show(id,b){
+document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+document.getElementById(id).classList.add('active');
+if(b)b.classList.add('active');
+}
+
+/* SAVE PROFILES */
+function saveAna(){localStorage.setItem("ana",JSON.stringify({name:a_name.value,reg:a_reg.value}));alert("Saved")}
+function saveHospital(){localStorage.setItem("hospital",JSON.stringify({name:h_name.value,city:h_city.value,address:h_address.value}));alert("Saved")}
+
+/* DROPDOWNS */
+function populate(){
+const s=new Set(),g=new Set(),a=new Set();
+cases.forEach(c=>{s.add(c.surgery);g.add(c.surgeon);a.add(c.ana)});
+fill("surgeryList",s);fill("surgeonList",g);fill("anaList",a);
+}
+function fill(id,set){const d=document.getElementById(id);d.innerHTML="";set.forEach(v=>{let o=document.createElement("option");o.value=v;d.appendChild(o)})}
+
+/* CASE */
+function saveCase(){
+cases.push({id:Date.now(),date:c_date.value,patient:c_patient.value,age:c_age.value,sex:c_sex.value,ipd:c_ipd.value,surgery:c_surgery.value,ana:c_ana.value,amount:+c_amount.value});
+localStorage.setItem("cases",JSON.stringify(cases));
+populate();renderCases();applyFilter();alert("Case saved");
+}
+function renderCases(){
+caseTable.innerHTML="";
+cases.forEach(c=>{
+caseTable.innerHTML+=`<tr><td>${c.date}</td><td>${c.patient}</td><td>${c.surgery}</td><td>${c.amount}</td>
+<td><span style="color:#0d6efd;cursor:pointer" onclick="viewReceipt(${c.id})">View</span></td></tr>`;
+});
+}
+
+/* RECEIPT */
+function viewReceipt(id){
+currentCase=cases.find(c=>c.id===id);
+show('receipt',document.querySelectorAll('.nav button')[4]);
+receiptBody.innerHTML=`<b>Patient:</b> ${currentCase.patient}<br><b>Amount:</b> ₹${currentCase.amount}`;
+}
+function numberToWords(n){return n.toString()}
+function nextReceipt(){let r=+localStorage.getItem("rno")||0;localStorage.setItem("rno",++r);return r}
+function generateReceiptPDF(){
+if(!currentCase){alert("Select case");return;}
+const {jsPDF}=window.jspdf,doc=new jsPDF();
+const a=JSON.parse(localStorage.getItem("ana")||"{}");
+const h=JSON.parse(localStorage.getItem("hospital")||"{}");
+const r=currentCase.rno||(currentCase.rno=nextReceipt());
+doc.text(h.name||"Hospital",105,15,{align:"center"});
+doc.text(h.address||"",105,22,{align:"center"});
+let y=40;
+doc.text(`Receipt No: ${r}`,14,y);y+=8;
+doc.text(`Date: ${currentCase.date}`,14,y);y+=8;
+doc.text(`Patient: ${currentCase.patient}`,14,y);y+=8;
+doc.text(`Amount: ₹${currentCase.amount}`,14,y);
+doc.text(`Anaesthetist: ${a.name||""} (${a.reg||""})`,105,280,{align:"center"});
+doc.save(`Receipt_${r}.pdf`);
+}
+
+/* SUMMARY */
+function applyFilter(){
+let list=[...cases],t=filterType.value;
+const today=new Date().toISOString().slice(0,10);
+if(t==="daily")list=list.filter(c=>c.date===today);
+if(t==="monthly")list=list.filter(c=>c.date.startsWith(today.slice(0,7)));
+if(t==="yearly")list=list.filter(c=>c.date.startsWith(today.slice(0,4)));
+if(t==="range"&&fromDate.value&&toDate.value)list=list.filter(c=>c.date>=fromDate.value&&c.date<=toDate.value);
+renderSummary(list);
+}
+function renderSummary(list){
+summaryTable.innerHTML="";let tot=0;
+list.forEach((c,i)=>{tot+=c.amount;summaryTable.innerHTML+=`<tr><td>${i+1}</td><td>${c.date}</td><td>${c.rno||""}</td><td>${c.patient}</td><td>${c.age}/${c.sex}</td><td>${c.surgery}</td><td>${c.ana}</td><td>${c.amount}</td></tr>`});
+totalAmount.innerText=tot;
+}
+
+/* EXPORTS */
+function exportCSV(){
+let csv="Date,Patient,Amount\n";
+cases.forEach(c=>csv+=`${c.date},${c.patient},${c.amount}\n`);
+download(csv,"summary.csv","text/csv");
+}
+function exportExcel(){
+const data=[["Date","Patient","Amount"]];
+cases.forEach(c=>data.push([c.date,c.patient,c.amount]));
+const ws=XLSX.utils.aoa_to_sheet(data),wb=XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb,ws,"Summary");
+XLSX.writeFile(wb,"summary.xlsx");
+}
+function exportPDF(){
+const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:"landscape"});
+doc.text("AnaesLog Summary",14,15);
+doc.autoTable({head:[["Date","Patient","Amount"]],body:cases.map(c=>[c.date,c.patient,c.amount]),startY:20});
+doc.save("summary.pdf");
+}
+function download(c,f,t){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=f;a.click()}
+
+/* INIT */
+populate();renderCases();applyFilter();
+</script>
+
+</body>
+</html>
